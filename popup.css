@@ -1,0 +1,88 @@
+html {
+  font-size: smaller;
+}
+
+body {
+  min-width: 400px;
+  max-width: 800px;
+  max-height: 600px;
+}
+
+/*
+ * Users
+ */
+.users {
+  margin-bottom: 8px;
+}
+
+.users span {
+  border-radius: .25rem;
+  color: #fff;
+  display: inline-block;
+  font-size: .9rem;
+  font-weight: 600;
+  margin: 2px;
+  padding: 3px 5px;
+}
+
+.users span.available {
+  background-color: #009900;
+}
+
+.users span.away {
+  background-color: #F57120
+}
+
+.users span.unavailable {
+  background-color: rgb(140, 140, 140);
+}
+
+/*
+ * Messages
+ */
+.message {
+  background-color: #eee;
+  border-radius: 5px;
+  margin-bottom: 8px;
+  padding: 5px 10px;
+}
+
+.separator {
+  font-size: 1rem;
+  padding-right: 6px;
+}
+
+.header {
+  white-space: nowrap;
+}
+
+.from, .to {
+  color: #1976d2;
+  font-size: 1rem;
+  font-weight: 600;
+  padding-right: 6px;
+  text-decoration: none;
+}
+
+.time {
+  color: #9e9e9e;
+  font-size: .8rem;
+}
+
+.body {
+  font-size: 1rem;
+}
+
+.deleted {
+  color: #999;
+  font-size: .8rem;
+  font-style: italic;
+  padding-right: 6px;
+}
+
+.updated {
+  color: #999;
+  font-size: .8rem;
+  font-style: italic;
+  padding-right: 6px;
+}

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 2,
+
+  "name": "Ryver Notifier",
+  "description": "This extension notifies on Ryver events",
+  "version": "1.0",
+
+  "options_page": "options.html",
+
+  "browser_action": {
+    "default_icon": "icon.png",
+    "default_popup": "popup.html"
+  },
+
+  "background": {
+    "scripts": ["library.js", "background.js"]
+  },
+
+  "permissions": [
+    "idle",
+    "notifications",
+    "storage",
+    "https://contattafiles.s3-us-west-1.amazonaws.com/",
+    "https://*.ryver.com/"
+  ]
+}
