@@ -58,7 +58,7 @@ async function checkUnreadTabs(organization) {
     if (unreadTabs.length > 0) {
       log('unreadTabs', descriptors, unreadTabs)
       notify({
-        title: 'Unread',
+        title: unreadTabs.length + ' unread',
         message: descriptors
       }, unreadNotificationId => chrome.storage.local.set({unreadNotificationId}))
     }
