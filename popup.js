@@ -38,7 +38,7 @@ function chatMessagesView(chatMessages, info) {
   const {findEntities} = ryverLibrary(info)
 
   return div(chatMessages
-    .filter(message => ['chat', 'chat_deleted', 'chat_updated'].includes(message.data.type))
+    .filter(message => ['chat', 'chat_deleted', 'chat_updated', 'user_typing'].includes(message.data.type))
     .sort(orderByDesc(message => message.time))
     .map(messageView))
 
@@ -53,6 +53,8 @@ function chatMessagesView(chatMessages, info) {
         return chatDeletedView(when, data, from, to)
       case 'chat_updated':
         return chatUpdatedView(when, data, from, to)
+       case 'user_typing':
+        return userTypingView(when, data, from, to)
     }
   }
 }
@@ -79,6 +81,16 @@ function chatUpdatedView(when, {key, text}, from, to) {
     headerView(when, from, to),
     div({class: 'body'}, [
       span({class: 'updated'}, 'UPDATED'),
+      span(text)
+    ])
+  ])
+}
+
+function userTypingView(when, {key, text}, from, to) {
+  return div({class: 'message', title: key}, [
+    headerView(when, from, to),
+    div({class: 'body'}, [
+      span({class: 'user-typing'}, 'user typing'),
       span(text)
     ])
   ])
