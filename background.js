@@ -155,7 +155,8 @@ function createWebSocket(info) {
       addChatMessage(data)
       notify({
         title: [from.descriptor, '➔', to.descriptor].join(' '),
-        message: [type, ':', data.state].join(' ')
+        message: [type, ':', data.state].join(' '),
+        iconUrl: from.avatarUrl
       })
     }
 
