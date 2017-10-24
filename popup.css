@@ -15,7 +15,7 @@ body {
   margin-bottom: 8px;
 }
 
-.users span {
+.users a {
   border-radius: .25rem;
   color: #fff;
   display: inline-block;
@@ -23,17 +23,18 @@ body {
   font-weight: 600;
   margin: 2px;
   padding: 3px 5px;
+  text-decoration: none;
 }
 
-.users span.available {
+.users .available {
   background-color: #009900;
 }
 
-.users span.away {
+.users .away {
   background-color: #F57120
 }
 
-.users span.unavailable {
+.users .unavailable {
   background-color: rgb(140, 140, 140);
 }
 

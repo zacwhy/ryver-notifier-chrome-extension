@@ -27,9 +27,11 @@ function usersView(users) {
       .map(userView))
 }
 
-function userView({descriptor, presence, received}) {
-  return span({
+function userView({descriptor, from: {entityType, id}, presence, received}) {
+  const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
+  return a({
     class: presence,
+    href: url,
     title: dateToString(new Date(received))
   }, descriptor)
 }
@@ -53,7 +55,7 @@ function chatMessagesView(chatMessages, info) {
         return chatDeletedView(when, data, from, to)
       case 'chat_updated':
         return chatUpdatedView(when, data, from, to)
-       case 'user_typing':
+      case 'user_typing':
         return userTypingView(when, data, from, to)
     }
   }
