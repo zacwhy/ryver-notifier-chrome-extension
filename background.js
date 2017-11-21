@@ -1,4 +1,4 @@
-let ws, chatMessages, users
+let ws, chatMessages, notifications, users
 
 main()
 
@@ -25,6 +25,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 })
 
 function reset() {
+  chrome.storage.local.get('notifications', items => notifications = items.notifications || {})
   chatMessages = []
   users = {}
   chrome.storage.local.set({chatMessages, users})
@@ -142,10 +143,11 @@ function createWebSocket(info) {
     const {type} = data
 
     if (['presence_change'].includes(type)) {
-      const {received, from, presence, client} = data
-      const {descriptor} = findEntity(from)
+      const {client, from: fromId, presence, received} = data
+      const from = findEntity(fromId)
+      const {descriptor} = from
       log([dateToString(new Date(received)), type, descriptor, presence, client].join(' '))
-      users[from] = {descriptor, received, presence}
+      users[fromId] = {descriptor, received, presence, from}
       chrome.storage.local.set({users})
     }
 
@@ -157,7 +159,7 @@ function createWebSocket(info) {
         title: [from.descriptor, '➔', to.descriptor].join(' '),
         message: [type, ':', data.state].join(' '),
         iconUrl: from.avatarUrl
-      })
+      }, storeNotificationMetadata({from, to}))
     }
 
     else if (['chat'].includes(type)) {
@@ -168,7 +170,7 @@ function createWebSocket(info) {
         title: [from.descriptor, '➔', to.descriptor].join(' '),
         message: data.text,
         iconUrl: from.avatarUrl
-      })
+      }, storeNotificationMetadata({from, to}))
     }
 
     else if (['chat_deleted', 'chat_updated'].includes(type)) {
@@ -185,6 +187,14 @@ function createWebSocket(info) {
         })
       }
     }
+
+    function storeNotificationMetadata(metadata) {
+      return notificationId => {
+        notifications[notificationId] = metadata
+        chrome.storage.local.set({notifications})
+      }
+    }
+
   }
 }
 
@@ -201,6 +211,27 @@ function addChatMessage(data) {
 
 function notify({type = 'basic', iconUrl, title, message}, callback) {
   chrome.notifications.create({type, iconUrl: iconUrl || 'icon.png', title, message}, callback)
+}
+
+chrome.notifications.onClicked.addListener(handleNotificationClick)
+chrome.notifications.onButtonClicked.addListener(handleNotificationClick)
+
+chrome.notifications.onClosed.addListener((notificationId, byUser) => {
+  console.log({notificationId, byUser})
+})
+
+function handleNotificationClick(notificationId) {
+  chrome.storage.local.get(['notifications', 'organization'], ({notifications, organization}) => {
+    const notification = notifications[notificationId]
+    if (notification) {
+      const {to: {entityType, id}} = notification
+      const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
+      chrome.tabs.create({url})
+    } else {
+      const url = `https://${organization}.ryver.com`
+      chrome.tabs.create({url})
+    }
+  })
 }
 
 // for development
