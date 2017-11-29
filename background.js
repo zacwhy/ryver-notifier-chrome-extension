@@ -25,6 +25,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 })
 
 function reset() {
+  localStorage.setItem('unreadCount', 0)
+
   chrome.storage.local.get('notifications', items => notifications = items.notifications || {})
   chatMessages = []
   users = {}
@@ -206,7 +208,12 @@ function addChatMessage(data) {
   const time = new Date().toISOString()
   chatMessages.push({time, data})
   chrome.storage.local.set({chatMessages})
-  chrome.browserAction.setBadgeText({text: chatMessages.length.toString()})
+
+  const oldUnreadCount = parseInt(localStorage.getItem('unreadCount'))
+  const newUnreadCount = oldUnreadCount + 1
+  localStorage.setItem('unreadCount', newUnreadCount)
+
+  chrome.browserAction.setBadgeText({text: newUnreadCount.toString()})
 }
 
 function notify({type = 'basic', iconUrl, title, message}, callback) {

@@ -3,7 +3,9 @@ const {a, div, span} = hyperscriptHelpers(h)
 let organization
 
 document.addEventListener('DOMContentLoaded', () => {
+  localStorage.setItem('unreadCount', 0)
   chrome.browserAction.setBadgeText({text: ''})
+
   chrome.storage.local.get(['info', 'chatMessages', 'organization', 'users'], ({info, chatMessages, organization: organization1, users}) => {
     organization = organization1
 
