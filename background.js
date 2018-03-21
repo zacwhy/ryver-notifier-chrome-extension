@@ -104,7 +104,7 @@ function minimizeInfo({forums, me, teams, users}) {
 function createWebSocket(info) {
   const {findEntity, findEntities} = ryverLibrary(info)
 
-  const ws = new WebSocket('wss://chat.ryver.com/apt38/1/ratatoskr')
+  const ws = new WebSocket('wss://prdchat.ryver.com/apt38/1/ratatoskr')
   ws.onopen = onOpen
   ws.onclose = onClose
   ws.onmessage = onMessage
@@ -112,13 +112,17 @@ function createWebSocket(info) {
 
   function onOpen() {
     logState('ws_open')
+
+    chrome.storage.local.remove('retryCount')
+    chrome.notifications.clear('reconnect')
+
     chrome.browserAction.setBadgeText({text: ''})
     chrome.browserAction.setTitle({title: 'Connected'})
 
     ws.send(JSON.stringify({
       id: nextId(),
       type: 'auth',
-      authorization: 'Session tnt255:' + info.me.id + ':0e507588c70ec8e5b5707542ea04b2621efa1574',
+      authorization: 'Session tnt255:' + info.me.id + ':89bbf0b80596dfb70f96905b2c72aafd509b7791',
       agent: 'Ryver',
       resource: 'Contatta-1496207329078'
     }))
@@ -135,7 +139,19 @@ function createWebSocket(info) {
 
     chrome.idle.queryState(60, state => {
       if (state === 'active' && navigator.onLine) {
-        connect()
+        chrome.storage.local.get('retryCount', ({retryCount}) => {
+          if (typeof retryCount === 'undefined') {
+            retryCount = 0
+          }
+          if (retryCount < 3) {
+            chrome.storage.local.set({retryCount: retryCount + 1})
+            console.log('retrying')
+            connect()
+          } else {
+            chrome.notifications.create('reconnect', {type: 'basic', iconUrl: 'icon.png', title: 'disconnected', message: 'reconnect?'})
+            console.log('try to reconnect?')
+          }
+        })
       }
     })
   }
