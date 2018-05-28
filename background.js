@@ -1,3 +1,4 @@
+const browser = chromePromises()
 let ws, chatMessages, notifications, users
 
 main()
@@ -10,7 +11,7 @@ function main() {
 }
 
 chrome.idle.onStateChanged.addListener(state => {
-  logState(state)
+  // logState(state)
   if (state === 'active' && ws.readyState === WebSocket.CLOSED && navigator.onLine) {
     connect()
   }
@@ -52,28 +53,22 @@ async function connectWithOrganization(organization) {
 
 async function checkUnreadTabs(organization) {
   const unreadTabs = await getUnreadTabs(organization)
-
-  const onUnreadTabs = () => {
+  if (unreadTabs.length > 0) {
     const descriptors = unreadTabs
       .sort(orderByDesc(unreadTab => unreadTab.lastMessageDate))
       .map(unreadTab => unreadTab.entity.__descriptor)
       .join(' • ');
-    if (unreadTabs.length > 0) {
-      log('unreadTabs', descriptors, unreadTabs)
-      notify({
-        title: unreadTabs.length + ' unread',
-        message: descriptors
-      }, unreadNotificationId => chrome.storage.local.set({unreadNotificationId}))
-    }
-  }
 
-  chrome.storage.local.get('unreadNotificationId', ({unreadNotificationId}) => {
-    if (unreadNotificationId) {
-      chrome.notifications.clear(unreadNotificationId, onUnreadTabs)
-    } else {
-      onUnreadTabs()
-    }
-  })
+    log('unreadTabs', descriptors, unreadTabs)
+    chrome.storage.local.set({unreadTabs})
+    chrome.notifications.clear('unreadTabs')
+    chrome.notifications.create('unreadTabs', {
+      type: 'basic',
+      iconUrl: 'icon.png',
+      title: unreadTabs.length + ' unread',
+      message: descriptors
+    })
+  }
 }
 
 async function getInfo(organization) {
@@ -111,7 +106,7 @@ function createWebSocket(info) {
   return ws
 
   function onOpen() {
-    logState('ws_open')
+    // logState('ws_open')
 
     chrome.storage.local.remove('retryCount')
     chrome.notifications.clear('reconnect')
@@ -134,7 +129,7 @@ function createWebSocket(info) {
   }
 
   function onClose() {
-    logState('ws_close')
+    // logState('ws_close')
     reset()
 
     chrome.idle.queryState(60, state => {
@@ -197,8 +192,8 @@ function createWebSocket(info) {
     }
 
     else {
-      log(data)
       if (!['ack', 'event'].includes(type)) {
+        log(data)
         notify({
           title: 'unhandled event: ' + type,
           message: event.data
@@ -243,35 +238,58 @@ chrome.notifications.onClosed.addListener((notificationId, byUser) => {
   console.log({notificationId, byUser})
 })
 
-function handleNotificationClick(notificationId) {
-  chrome.storage.local.get(['notifications', 'organization'], ({notifications, organization}) => {
+async function handleNotificationClick(notificationId) {
+  if (notificationId === 'unreadTabs') {
+    const {organization, unreadTabs} = await browser.storage.local.get(['organization', 'unreadTabs'])
+    const {id, __metadata: {type}} = unreadTabs[0].entity
+    const entityType = type === 'Entity.Workroom' ? 'teams' : 'users'
+    const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
+    chrome.tabs.create({url})
+  } else {
+    const {info, notifications, organization} = await browser.storage.local.get(['info', 'notifications', 'organization'])
     const notification = notifications[notificationId]
     if (notification) {
-      const {to: {entityType, id}} = notification
+      const target = notification.to.entityType === 'teams' || notification.from.id === info.me.id ? notification.to : notification.from
+      const {entityType, id} = target
       const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
       chrome.tabs.create({url})
     } else {
       const url = `https://${organization}.ryver.com`
       chrome.tabs.create({url})
     }
-  })
+  }
 }
 
 // for development
-function logState(...message) {
-  chrome.idle.queryState(60, state =>
-    log(...message,
-      state,
-      ['connecting', 'open', 'closing', 'closed'][ws.readyState],
-      navigator.onLine ? 'online' : 'offline'
-    )
-  )
-}
+// function logState(...message) {
+//   chrome.idle.queryState(60, state =>
+//     log(...message,
+//       state,
+//       ['connecting', 'open', 'closing', 'closed'][ws.readyState],
+//       navigator.onLine ? 'online' : 'offline'
+//     )
+//   )
+// }
 
 function log(...message) {
-  console.log(dateToString(new Date()), ...message)
+  console.log(...message)
 }
 
 
-window.addEventListener('online', () => logState('online'))
-window.addEventListener('offline', () => logState('offline'))
+// window.addEventListener('online', () => logState('online'))
+// window.addEventListener('offline', () => logState('offline'))
+
+function chromePromises() {
+  return {
+    storage: {
+      local: {
+        get: keys => new Promise((resolve, reject) => {
+          chrome.storage.local.get(keys, items => {
+            if (chrome.runtime.lastError) reject(chrome.runtime.lastError)
+            else resolve(items)
+          })
+        })
+      }
+    }
+  }
+}
