@@ -21,7 +21,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && Object.keys(changes).includes('organization')) {
     log('organization_changed', changes.organization.newValue)
     ws.close()
-    connectWithOrganization(changes.organization.newValue)
+    tryConnectWithOrganization(changes.organization.newValue)
   }
 })
 
@@ -38,14 +38,33 @@ function reset() {
 }
 
 function connect() {
-  chrome.storage.local.get('organization', ({organization}) => connectWithOrganization(organization))
+  chrome.storage.local.get('organization', ({organization}) => tryConnectWithOrganization(organization))
+}
+
+async function tryConnectWithOrganization(organization) {
+  try {
+    await connectWithOrganization(organization)
+  } catch (e) {
+    chrome.notifications.create('error', {
+      type: 'basic',
+      iconUrl: 'icon.png',
+      title: 'Error',
+      message: e.message,
+      requireInteraction: true
+    })
+  }
 }
 
 async function connectWithOrganization(organization) {
-  if (!organization) {
-    throw new Error('Organization must be provided')
+  // if (!organization) {
+  //   throw new Error('Organization must be provided')
+  // }
+  const url = `https://${organization}.ryver.com/api/1/odata.svc/Ryver.Info()?$format=json`
+  const response = await fetch(url, {credentials: 'include'})
+  if (response.status !== 200) {
+    throw new Error(response.statusText)
   }
-  const info = await getInfo(organization).then(minimizeInfo)
+  const info = await response.json().then(json => json.d)
   chrome.storage.local.set({info})
   ws = createWebSocket(info)
   checkUnreadTabs(organization)
@@ -66,14 +85,10 @@ async function checkUnreadTabs(organization) {
       type: 'basic',
       iconUrl: 'icon.png',
       title: unreadTabs.length + ' unread',
-      message: descriptors
+      message: descriptors,
+      requireInteraction: true
     })
   }
-}
-
-async function getInfo(organization) {
-  const url = `https://${organization}.ryver.com/api/1/odata.svc/Ryver.Info()?$format=json`
-  return await fetch(url, {credentials: 'include'}).then(res => res.json()).then(json => json.d)
 }
 
 async function getTabsState(organization) {
