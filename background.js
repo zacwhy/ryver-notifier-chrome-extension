@@ -12,7 +12,7 @@ function main() {
 
 chrome.idle.onStateChanged.addListener(state => {
   // logState(state)
-  if (state === 'active' && ws.readyState === WebSocket.CLOSED && navigator.onLine) {
+  if (state === 'active' && (!ws || ws.readyState === WebSocket.CLOSED) && navigator.onLine) {
     connect()
   }
 })
