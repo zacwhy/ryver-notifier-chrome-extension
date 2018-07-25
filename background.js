@@ -260,6 +260,7 @@ async function handleNotificationClick(notificationId) {
     const entityType = type === 'Entity.Workroom' ? 'teams' : 'users'
     const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
     chrome.tabs.create({url})
+    chrome.notifications.clear(notificationId)
   } else {
     const {info, notifications, organization} = await browser.storage.local.get(['info', 'notifications', 'organization'])
     const notification = notifications[notificationId]
