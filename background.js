@@ -56,9 +56,6 @@ async function tryConnectWithOrganization(organization) {
 }
 
 async function connectWithOrganization(organization) {
-  // if (!organization) {
-  //   throw new Error('Organization must be provided')
-  // }
   const url = `https://${organization}.ryver.com/api/1/odata.svc/Ryver.Info()?$format=json`
   const response = await fetch(url, {credentials: 'include'})
   if (response.status !== 200) {
@@ -120,59 +117,67 @@ function createWebSocket(info) {
   ws.onmessage = onMessage
   return ws
 
-  function onOpen() {
-    // logState('ws_open')
+  async function onOpen() {
+    console.log('ws open')
 
-    chrome.storage.local.remove('retryCount')
-    chrome.notifications.clear('reconnect')
-
-    chrome.browserAction.setBadgeText({text: ''})
-    chrome.browserAction.setTitle({title: 'Connected'})
+    const cookie = await browser.cookies.get({ url: 'https://mrlabs.ryver.com', name: 'PHPSESSID' })
+    const sessionId = decodeURIComponent(cookie.value)
 
     ws.send(JSON.stringify({
       id: nextId(),
       type: 'auth',
-      authorization: 'Session tnt255:' + info.me.id + ':89bbf0b80596dfb70f96905b2c72aafd509b7791',
+      authorization: 'Session ' + sessionId,
       agent: 'Ryver',
       resource: 'Contatta-1496207329078'
     }))
-
-    ws.send(JSON.stringify({
-      presence: 'unavailable',
-      type: 'presence_change'
-    }))
   }
 
-  function onClose() {
-    // logState('ws_close')
+  async function onClose() {
+    console.log('ws closed')
     reset()
 
-    chrome.idle.queryState(60, state => {
-      if (state === 'active' && navigator.onLine) {
-        chrome.storage.local.get('retryCount', ({retryCount}) => {
-          if (typeof retryCount === 'undefined') {
-            retryCount = 0
-          }
-          if (retryCount < 3) {
-            chrome.storage.local.set({retryCount: retryCount + 1})
-            console.log('retrying')
-            connect()
-          } else {
-            chrome.notifications.create('reconnect', {type: 'basic', iconUrl: 'icon.png', title: 'disconnected', message: 'reconnect?'})
-            console.log('try to reconnect?')
-          }
-        })
-      }
-    })
+    const { retryCount = 0 } = await browser.storage.local.get('retryCount')
+
+    if (retryCount < 2) {
+      chrome.storage.local.set({ retryCount: retryCount + 1 })
+      connect()
+    } else {
+      chrome.notifications.create('reconnect', {
+        type: 'basic',
+        iconUrl: 'icon.png',
+        title: 'WS Closed',
+        message: 'Reconnect?',
+        requireInteraction: true
+      })
+    }
+
+    // chrome.idle.queryState(60, state => {
+    //   if (state === 'active' && navigator.onLine) {
+    //   }
+    // })
   }
 
   function onMessage(event) {
     const data = JSON.parse(event.data)
     const {type} = data
 
-    if (['presence_change'].includes(type)) {
+    if (['ack'].includes(type)) {
+      log('ack', data)
+      chrome.storage.local.remove('retryCount')
+      chrome.notifications.clear('reconnect')
+
+      chrome.browserAction.setBadgeText({text: ''})
+      chrome.browserAction.setTitle({title: 'Connected'})
+
+      ws.send(JSON.stringify({
+        presence: 'unavailable',
+        type: 'presence_change'
+      }))
+    }
+
+    else if (['presence_change'].includes(type)) {
       const {client, from: fromId, presence, received} = data
-      const from = findEntity(fromId)
+      const from = findEntity(fromId) || {descriptor: fromId}
       const {descriptor} = from
       log([dateToString(new Date(received)), type, descriptor, presence, client].join(' '))
       users[fromId] = {descriptor, received, presence, from}
@@ -207,7 +212,7 @@ function createWebSocket(info) {
     }
 
     else {
-      if (!['ack', 'event'].includes(type)) {
+      if (!['event'].includes(type)) {
         log(data)
         notify({
           title: 'unhandled event: ' + type,
@@ -261,6 +266,9 @@ async function handleNotificationClick(notificationId) {
     const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
     chrome.tabs.create({url})
     chrome.notifications.clear(notificationId)
+  } else if (notificationId === 'reconnect') {
+    connect()
+    chrome.notifications.clear(notificationId)
   } else {
     const {info, notifications, organization} = await browser.storage.local.get(['info', 'notifications', 'organization'])
     const notification = notifications[notificationId]
@@ -291,12 +299,35 @@ function log(...message) {
   console.log(...message)
 }
 
-
-// window.addEventListener('online', () => logState('online'))
-// window.addEventListener('offline', () => logState('offline'))
+window.addEventListener('error', event => {
+  console.log('error', event)
+  chrome.notifications.create('error', {
+    type: 'basic',
+    iconUrl: 'icon.png',
+    title: 'Error',
+    message: event.message,
+    requireInteraction: true
+  })
+})
 
 function chromePromises() {
   return {
+    cookies: {
+      get: details => new Promise((resolve, reject) => {
+        chrome.cookies.get(details, cookie => {
+          if (chrome.runtime.lastError) reject(chrome.runtime.lastError)
+          else resolve(cookie)
+        })
+      })
+    },
+    idle: {
+      queryState: detectionIntervalInSeconds => new Promise((resolve, reject) => {
+        chrome.idle.queryState(detectionIntervalInSeconds, newState => {
+          if (chrome.runtime.lastError) reject(chrome.runtime.lastError)
+          else resolve(newState)
+        })
+      })
+    },
     storage: {
       local: {
         get: keys => new Promise((resolve, reject) => {
