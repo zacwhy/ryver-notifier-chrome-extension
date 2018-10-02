@@ -11,8 +11,8 @@ function main() {
 }
 
 chrome.idle.onStateChanged.addListener(state => {
-  // logState(state)
-  if (state === 'active' && (!ws || ws.readyState === WebSocket.CLOSED) && navigator.onLine) {
+  console.log(`state=${state}`)
+  if (state === 'active' && navigator.onLine && (!ws || ws.readyState === WebSocket.CLOSED)) {
     connect()
   }
 })
@@ -45,7 +45,7 @@ async function tryConnectWithOrganization(organization) {
   try {
     await connectWithOrganization(organization)
   } catch (e) {
-    chrome.notifications.create('error', {
+    chrome.notifications.create('reconnect', {
       type: 'basic',
       iconUrl: 'icon.png',
       title: 'Error',
@@ -58,7 +58,7 @@ async function tryConnectWithOrganization(organization) {
 async function connectWithOrganization(organization) {
   const url = `https://${organization}.ryver.com/api/1/odata.svc/Ryver.Info()?$format=json`
   const response = await fetch(url, {credentials: 'include'})
-  if (response.status !== 200) {
+  if (! response.ok) {
     throw new Error(response.statusText)
   }
   const info = await response.json().then(json => json.d)
@@ -138,7 +138,10 @@ function createWebSocket(info) {
 
     const { retryCount = 0 } = await browser.storage.local.get('retryCount')
 
-    if (retryCount < 2) {
+    const state = await browser.idle.queryState(60)
+    console.log(`retry state=${state} navigator.onLine=${navigator.onLine}`)
+
+    if (retryCount < 2 && navigator.onLine) { // TODO: need to check state?
       chrome.storage.local.set({ retryCount: retryCount + 1 })
       connect()
     } else {
@@ -150,18 +153,13 @@ function createWebSocket(info) {
         requireInteraction: true
       })
     }
-
-    // chrome.idle.queryState(60, state => {
-    //   if (state === 'active' && navigator.onLine) {
-    //   }
-    // })
   }
 
   function onMessage(event) {
     const data = JSON.parse(event.data)
     const {type} = data
 
-    if (['ack'].includes(type)) {
+    if (type === 'ack') {
       log('ack', data)
       chrome.storage.local.remove('retryCount')
       chrome.notifications.clear('reconnect')
@@ -175,7 +173,7 @@ function createWebSocket(info) {
       }))
     }
 
-    else if (['presence_change'].includes(type)) {
+    else if (type === 'presence_change') {
       const {client, from: fromId, presence, received} = data
       const from = findEntity(fromId) || {descriptor: fromId}
       const {descriptor} = from
@@ -184,7 +182,7 @@ function createWebSocket(info) {
       chrome.storage.local.set({users})
     }
 
-    else if (['user_typing'].includes(type)) {
+    else if (type === 'user_typing') {
       const [from, to] = findEntities(data.from, data.to)
       log([type, from.descriptor, '➔', to.descriptor, ':', data.state].join(' '))
       addChatMessage(data)
@@ -195,20 +193,35 @@ function createWebSocket(info) {
       }, storeNotificationMetadata({from, to}))
     }
 
-    else if (['chat'].includes(type)) {
+    else if (type === 'chat') {
       const [from, to] = findEntities(data.from, data.to)
       log([type, from.descriptor, '➔', to.descriptor, ':', data.text].join(' '), data)
       addChatMessage(data)
+      const fromDescriptor = data.createSource ? data.createSource.displayName : from.descriptor
+      const fromAvatarUrl = data.createSource ? data.createSource.avatar : from.avatarUrl
       notify({
-        title: [from.descriptor, '➔', to.descriptor].join(' '),
+        title: [fromDescriptor, '➔', to.descriptor].join(' '),
         message: data.text,
-        iconUrl: from.avatarUrl
+        iconUrl: fromAvatarUrl
       }, storeNotificationMetadata({from, to}))
     }
 
     else if (['chat_deleted', 'chat_updated'].includes(type)) {
       log(data)
       addChatMessage(data)
+    }
+
+    else if (type === 'voice_change') {
+      log(data)
+      const {client, from: fromId, presence, received} = data
+      const from = findEntity(fromId) || {descriptor: fromId}
+      console.log('from', from)
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: from.avatarUrl || 'icon.png',
+        title: 'voice_change',
+        message: from.descriptor
+      })
     }
 
     else {
@@ -254,15 +267,26 @@ function notify({type = 'basic', iconUrl, title, message}, callback) {
 chrome.notifications.onClicked.addListener(handleNotificationClick)
 chrome.notifications.onButtonClicked.addListener(handleNotificationClick)
 
-chrome.notifications.onClosed.addListener((notificationId, byUser) => {
-  console.log({notificationId, byUser})
-})
+// chrome.notifications.onClosed.addListener((notificationId, byUser) => {
+//   console.log({notificationId, byUser})
+// })
+
+function getEntityType(type) {
+  switch (type) {
+    case 'Entity.Forum':
+      return 'forums'
+    case 'Entity.Workroom':
+      return 'teams'
+    default:
+      return 'users'
+  }
+}
 
 async function handleNotificationClick(notificationId) {
   if (notificationId === 'unreadTabs') {
     const {organization, unreadTabs} = await browser.storage.local.get(['organization', 'unreadTabs'])
     const {id, __metadata: {type}} = unreadTabs[0].entity
-    const entityType = type === 'Entity.Workroom' ? 'teams' : 'users'
+    const entityType = getEntityType(type)
     const url = `https://${organization}.ryver.com/index.html#${entityType}/${id}`
     chrome.tabs.create({url})
     chrome.notifications.clear(notificationId)
@@ -284,17 +308,6 @@ async function handleNotificationClick(notificationId) {
   }
 }
 
-// for development
-// function logState(...message) {
-//   chrome.idle.queryState(60, state =>
-//     log(...message,
-//       state,
-//       ['connecting', 'open', 'closing', 'closed'][ws.readyState],
-//       navigator.onLine ? 'online' : 'offline'
-//     )
-//   )
-// }
-
 function log(...message) {
   console.log(...message)
 }
@@ -309,34 +322,3 @@ window.addEventListener('error', event => {
     requireInteraction: true
   })
 })
-
-function chromePromises() {
-  return {
-    cookies: {
-      get: details => new Promise((resolve, reject) => {
-        chrome.cookies.get(details, cookie => {
-          if (chrome.runtime.lastError) reject(chrome.runtime.lastError)
-          else resolve(cookie)
-        })
-      })
-    },
-    idle: {
-      queryState: detectionIntervalInSeconds => new Promise((resolve, reject) => {
-        chrome.idle.queryState(detectionIntervalInSeconds, newState => {
-          if (chrome.runtime.lastError) reject(chrome.runtime.lastError)
-          else resolve(newState)
-        })
-      })
-    },
-    storage: {
-      local: {
-        get: keys => new Promise((resolve, reject) => {
-          chrome.storage.local.get(keys, items => {
-            if (chrome.runtime.lastError) reject(chrome.runtime.lastError)
-            else resolve(items)
-          })
-        })
-      }
-    }
-  }
-}

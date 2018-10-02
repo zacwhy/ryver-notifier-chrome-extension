@@ -44,3 +44,32 @@ function ryverLibrary(info) {
     return null
   }
 }
+
+function chromePromises() {
+  return {
+    cookies: {
+      get: promisify(chrome.cookies.get)
+    },
+    idle: {
+      queryState: promisify(chrome.idle.queryState)
+    },
+    storage: {
+      local: {
+        get: promisify(chrome.storage.local.get)
+      }
+    }
+  }
+}
+
+function promisify(fn) {
+  return (...args) => new Promise((resolve, reject) => {
+    fn(...args, value => {
+      const error = chrome.runtime.lastError
+      if (error) {
+        reject(error)
+      } else {
+        resolve(value)
+      }
+    })
+  })
+}
