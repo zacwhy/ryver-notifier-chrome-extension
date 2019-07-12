@@ -22,6 +22,7 @@
     "notifications",
     "storage",
     "https://contattafiles.s3-us-west-1.amazonaws.com/",
+    "https://*.amazonaws.com/",
     "https://*.ryver.com/"
   ]
 }

@@ -55,7 +55,7 @@ function chromePromises() {
     },
     storage: {
       local: {
-        get: promisify(chrome.storage.local.get)
+        get: promisify(chrome.storage.local.get.bind(chrome.storage.local))
       }
     }
   }
