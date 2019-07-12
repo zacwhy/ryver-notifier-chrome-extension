@@ -186,11 +186,13 @@ function createWebSocket(info) {
       const [from, to] = findEntities(data.from, data.to)
       log([type, from.descriptor, '➔', to.descriptor, ':', data.state].join(' '))
       addChatMessage(data)
-      notify({
+
+      chrome.notifications.create(data.from, {
+        type: 'basic',
+        iconUrl: from.avatarUrl,
         title: [from.descriptor, '➔', to.descriptor].join(' '),
-        message: [type, ':', data.state].join(' '),
-        iconUrl: from.avatarUrl
-      }, storeNotificationMetadata({from, to}))
+        message: [type, ':', data.state].join(' ')
+      })
     }
 
     else if (type === 'chat') {
