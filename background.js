@@ -215,15 +215,6 @@ function createWebSocket(info) {
 
     else if (type === 'voice_change') {
       log(data)
-      const {client, from: fromId, presence, received} = data
-      const from = findEntity(fromId) || {descriptor: fromId}
-      console.log('from', from)
-      chrome.notifications.create({
-        type: 'basic',
-        iconUrl: from.avatarUrl || 'icon.png',
-        title: 'voice_change',
-        message: from.descriptor
-      })
     }
 
     else {
