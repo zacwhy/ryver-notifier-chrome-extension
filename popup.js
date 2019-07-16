@@ -9,9 +9,13 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['info', 'chatMessages', 'organization', 'users'], ({info, chatMessages, organization: organization1, users}) => {
     organization = organization1
 
-    document.querySelector('body').innerHTML = a({href: `https://${organization}.ryver.com/index.html`})
-      + usersView(users)
-      + chatMessagesView(chatMessages, info)
+    if (info === undefined) {
+      document.querySelector('body').innerHTML = a({href: `https://${organization}.ryver.com/`}, 'Login')
+    } else {
+      document.querySelector('body').innerHTML = a({href: `https://${organization}.ryver.com/`})
+        + usersView(users)
+        + chatMessagesView(chatMessages, info)
+    }
 
     document.querySelectorAll('a').forEach(anchor => {
       anchor.onclick = e => {
