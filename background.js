@@ -213,6 +213,10 @@ function createWebSocket(info) {
       addChatMessage(data)
     }
 
+    else if (type === 'mark_read') {
+      log(data)
+    }
+
     else if (type === 'voice_change') {
       log(data)
     }
